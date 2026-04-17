@@ -1,0 +1,36 @@
+{
+  "strategy": "Single-Phase",
+  "overview": "The design contains a single independent Go service with no dependencies, so it is implemented in a single phase.",
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Foundation Services",
+      "description": "Single standalone Go backend service providing the complete todo API including the new PATCH endpoint.",
+      "components": [
+        {
+          "name": "todo-api",
+          "componentType": "service",
+          "language": "Go",
+          "deployment": "Docker",
+          "responsibilities": [
+            "Expose REST endpoints for creating, listing, retrieving, updating, and deleting todos",
+            "Implement PATCH /todos/{id} to toggle completion with completed_at timestamping",
+            "Enforce bearer-token authentication and per-owner authorization",
+            "Maintain thread-safe in-memory storage with mutex-guarded atomic updates",
+            "Provide /health endpoint and consistent JSON error responses"
+          ],
+          "architectureContext": "Standalone HTTP service on port 9090 serving clients directly; no downstream dependencies. It is the sole component of the system and handles auth, storage, and API logic internally.",
+          "keyConsiderations": [
+            "Use sync.RWMutex around map[string]*Todo; perform the PATCH read-modify-write under a single write lock for atomicity/idempotency",
+            "JSON decoder must use DisallowUnknownFields and handle empty body defaulting completed=true",
+            "Return 405 with Allow header for unsupported methods; distinguish 401 vs 403 correctly",
+            "Ensure completed_at is set only on false-\u003etrue transition and cleared when set to false; idempotent repeats must not change timestamp",
+            "Multi-stage Dockerfile with distroless/static base; include httptest-based unit tests for all status codes and idempotency"
+          ],
+          "apiContract": "openapi: 3.0.3\ninfo:\n  title: Todo API\n  version: 1.1.0\nservers:\n  - url: /\npaths:\n  /health:\n    get:\n      summary: Health check\n      responses:\n        '200':\n          description: OK\n  /todos:\n    get:\n      summary: List todos\n      security:\n        - bearerAuth: []\n      responses:\n        '200':\n          description: List\n          content:\n            application/json:\n              schema:\n                type: array\n                items:\n                  $ref: '#/components/schemas/Todo'\n    post:\n      summary: Create todo\n      security:\n        - bearerAuth: []\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [title]\n              properties:\n                title: { type: string }\n      responses:\n        '201':\n          description: Created\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/Todo' }\n  /todos/{id}:\n    get:\n      summary: Get todo\n      security:\n        - bearerAuth: []\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema: { type: string }\n      responses:\n        '200':\n          description: OK\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/Todo' }\n        '404': { $ref: '#/components/responses/Error' }\n    patch:\n      summary: Mark todo completion status\n      security:\n        - bearerAuth: []\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema: { type: string }\n      requestBody:\n        required: false\n        content:\n          application/json:\n            schema:\n              type: object\n              properties:\n                completed: { type: boolean, default: true }\n              additionalProperties: false\n      responses:\n        '200':\n          description: Updated todo\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/Todo' }\n        '400': { $ref: '#/components/responses/Error' }\n        '401': { $ref: '#/components/responses/Error' }\n        '403': { $ref: '#/components/responses/Error' }\n        '404': { $ref: '#/components/responses/Error' }\n        '405': { $ref: '#/components/responses/Error' }\n    delete:\n      summary: Delete todo\n      security:\n        - bearerAuth: []\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema: { type: string }\n      responses:\n        '204': { description: Deleted }\n        '404': { $ref: '#/components/responses/Error' }\ncomponents:\n  securitySchemes:\n    bearerAuth:\n      type: http\n      scheme: bearer\n  responses:\n    Error:\n      description: Error response\n      content:\n        application/json:\n          schema: { $ref: '#/components/schemas/Error' }\n  schemas:\n    Todo:\n      type: object\n      properties:\n        id: { type: string }\n        title: { type: string }\n        owner: { type: string }\n        completed: { type: boolean }\n        completed_at: { type: string, format: date-time, nullable: true }\n        created_at: { type: string, format: date-time }\n    Error:\n      type: object\n      properties:\n        code: { type: string }\n        message: { type: string }\n",
+          "dependencies": []
+        }
+      ]
+    }
+  ]
+}
