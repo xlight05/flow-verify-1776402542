@@ -1,0 +1,12 @@
+/todo-api
+/bin/
+/out/
+*.exe
+*.test
+*.out
+.DS_Store
+.idea/
+.vscode/
+.logs/
+.mcp-config.json
+/data/
