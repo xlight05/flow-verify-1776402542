@@ -6,26 +6,21 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/openchoreo/todo-api/internal/handlers"
 	"github.com/openchoreo/todo-api/internal/middleware"
+	"github.com/openchoreo/todo-api/internal/models"
 	"github.com/openchoreo/todo-api/internal/store"
 )
 
 func main() {
-	dataFile := os.Getenv("DATA_FILE")
-	if dataFile == "" {
-		dataFile = "/data/todos.json"
-	}
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "9090"
 	}
 
-	s, err := store.New(dataFile)
-	if err != nil {
-		log.Fatalf("failed to initialize store: %v", err)
-	}
+	s := store.New()
+	seed(s)
 
 	mux := http.NewServeMux()
 	h := handlers.New(s)
@@ -39,8 +34,33 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	log.Printf("todo-api listening on :%s (data file: %s)", port, dataFile)
+	log.Printf("todo-api listening on :%s", port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+func seed(s *store.Store) {
+	now := time.Now().UTC()
+	s.Add(&models.Todo{
+		ID:        uuid.NewString(),
+		Title:     "Read the API docs",
+		Owner:     "alice",
+		Completed: false,
+		CreatedAt: now,
+	})
+	s.Add(&models.Todo{
+		ID:        uuid.NewString(),
+		Title:     "Write sample todos",
+		Owner:     "alice",
+		Completed: false,
+		CreatedAt: now,
+	})
+	s.Add(&models.Todo{
+		ID:        uuid.NewString(),
+		Title:     "Deploy the service",
+		Owner:     "bob",
+		Completed: false,
+		CreatedAt: now,
+	})
 }
